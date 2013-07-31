@@ -85,18 +85,17 @@ void setup()
   ballNoise.setLooping(false);
   ballNoise.volume(1);
 
-  gameMusic = maxim.loadFile("Tranquility.wav");
-  gameMusic.setAnalysing(true);
-  gameMusic.setLooping(true);
-  gameMusic.volume(.70);
-  gameMusic.play();
+  //  gameMusic = maxim.loadFile("Tranquility.wav");
+  //  gameMusic.setAnalysing(true);
+  //  gameMusic.setLooping(true);
+  //  gameMusic.volume(.70);
+  //  gameMusic.play();
 
   //image setup
   ballImage = loadImage("red circle.png");
   imageMode(CENTER);
 
   setupGame();
-  println(physics.getRestitution());
 }
 
 
@@ -152,7 +151,6 @@ void generateBarriers()
     }
     currX = 0;
     currY += height/sections;
-    println(currY);
   }
 }
 
@@ -161,28 +159,27 @@ void generateBlockers()
 {
   float sections = 7;
   float currY = height / sections;
-
+  int rowChoice = (int)random(0, 1);
+  float radSize = random(15, 15);
   //create sections-1 rows
   for (int i = 0; i < sections-1; i++)
   {
-    float xOffset = random(-50, 100);
-    float currX = 20 + xOffset;
-    float numberOfBarriers = random(3, 8);
+    float numberOfBarriers = i % 2 == rowChoice ? 7 : 8;
+    float currX = (width - radSize*4*numberOfBarriers + radSize*2)/2;
 
     //create random number of bumbers in this row. Random offsets make things more...random
     for (int j = 0; j < numberOfBarriers; j++)
     {
-      float offsetY = random(0, 0);
-      float radSize = random(10, 18);
       physics.setRestitution(map(radSize, 10, 18, .3, .8));
-      Body blocker = physics.createCircle(currX, currY+offsetY, radSize);
+      Body blocker = physics.createCircle(currX, currY, radSize);
       physics.setRestitution(.1);
       UserData data = new UserData();
       data.pachinko_type = UserData.BLOCKER;
       blocker.setUserData(data);
-      currX += width / numberOfBarriers + random(-10, 10);
+      currX += radSize*4 + radSize/numberOfBarriers;// width / numberOfBarriers;
     }
-    currX = 20;
+
+    currX = (width - radSize*4*numberOfBarriers + radSize*2)/2;
     currY += height/sections;
   }
 }
@@ -280,35 +277,39 @@ void updateMover(Body mover)
 //do most of the drawing. Called in customRenderer
 void displayGame(World world)
 {
-  //pulse background based on music playing
-  float[] spec = gameMusic.getPowerSpectrum();
-  float red, green, blue;
-  float power = 0;
-  float scale = 10000;
-  int p = 0;
-  for ( ; p < spec.length / 3; p++);
+  if (gameMusic != null)
   {
-    power += scale * spec[p];
-  }
-  red = power / (spec.length / 3);
-  power = 0;
-  for ( ; p < spec.length* 2 / 3; p++);
-  {
-    power += scale * spec[p];
-  }
-  green = power / (spec.length / 3);
-  power = 0;
-  for ( ; p < spec.length - 1; p++);
-  {
-    power += scale * spec[p];
-  }
-  blue = power / (spec.length / 3);
+    //pulse background based on music playing
+    float[] spec = gameMusic.getPowerSpectrum();
+    float red, green, blue;
+    float power = 0;
+    float scale = 10000;
+    int p = 0;
+    for ( ; p < spec.length / 3; p++);
+    {
+      power += scale * spec[p];
+    }
+    red = power / (spec.length / 3);
+    power = 0;
+    for ( ; p < spec.length* 2 / 3; p++);
+    {
+      power += scale * spec[p];
+    }
+    green = power / (spec.length / 3);
+    power = 0;
+    for ( ; p < spec.length - 1; p++);
+    {
+      power += scale * spec[p];
+    }
+    blue = power / (spec.length / 3);
 
-  red = map(red, 0, 20, 0, 100);
-  green = map(green, 0, 20, 0, 100);
-  blue = map(blue, 0, 20, 0, 255);
-  background(red, green, blue);
-  
+    red = map(red, 0, 20, 0, 100);
+    green = map(green, 0, 20, 0, 100);
+    blue = map(blue, 0, 20, 0, 255);
+    background(red, green, blue);
+  }
+  else
+    background(150);
   drawScoreArea();
 
   if (currentBall != null)
@@ -409,11 +410,13 @@ void myCustomRenderer(World world)
   {
     //display game over info
     gameOverScreen();
-    gameMusic.volume(1.0);
+    if (gameMusic != null)
+      gameMusic.volume(1.0);
   }
   else if (paused)
   {
-    gameMusic.volume(1.0);
+    if (gameMusic != null)
+      gameMusic.volume(1.0);
     //Freeze physics simulation (Not sure if there is better way to do this...)
     physics.getSettings().hz = Integer.MAX_VALUE;
     displayMenu(world);
@@ -421,7 +424,8 @@ void myCustomRenderer(World world)
   else
   {
     //game not paused. render game at normal speed
-    gameMusic.volume(.70);
+    if (gameMusic != null)
+      gameMusic.volume(.70);
     //run game normally
     physics.getSettings().hz = simSpeed;
     for (int i = 0; i < movers.size(); i++)
