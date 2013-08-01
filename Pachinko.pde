@@ -17,6 +17,9 @@ AudioPlayer scoreBarNoise;
 //button stuff
 Button again;
 Button exit;
+Button play;
+Button instructions;
+Button backFromInstr; 
 
 //image stuff
 PImage ballImage;
@@ -40,6 +43,8 @@ float extraSpace;
 //score and game stuff
 boolean paused = false;
 boolean gameOver = false;
+boolean justStarted = true;
+boolean instruct = false;
 int simSpeed;
 float points;
 float ballsLeft;
@@ -49,7 +54,8 @@ final int MAX_BALLS = 10;
 
 void setup()
 {
-  size(500, 800);
+  background(0);
+  size(550, 800);
   frameRate(60);
 
   //button setup
@@ -57,6 +63,12 @@ void setup()
   (int) (textWidth("Play Again!")) + 15, 30);
   exit = new Button("Exit.", (int)(width / 2 + 50), (int)(height/2 + 80), 
   (int) (textWidth("Exit.")) + 15, 30);
+  play = new Button("Play!", (int)(width / 2 - 100), (int)(height/2), 
+  (int) (textWidth("Play!")) + 15, 30);
+  instructions = new Button("Instructions", (int)(width / 2), (int)(height/2), 
+  (int) (textWidth("Instructions")) + 15, 30);
+  backFromInstr = new Button("Back", (int)(width / 2), (int)(height*4/5), 
+  (int) (textWidth("Back")) + 15, 30);
 
   //body container setup
   barriers = new ArrayList<Body>();
@@ -95,7 +107,7 @@ void setup()
   ballImage = loadImage("red circle.png");
   imageMode(CENTER);
 
-  setupGame();
+  //  setupGame();
 }
 
 
@@ -157,15 +169,16 @@ void generateBarriers()
 //generates a bunch of circular bumpers
 void generateBlockers()
 {
-  float sections = 7;
+  float sections = 8;
   float currY = height / sections;
   int rowChoice = (int)random(0, 1);
   float radSize = random(15, 15);
+  float extraOffset = 10;
   //create sections-1 rows
   for (int i = 0; i < sections-1; i++)
   {
     float numberOfBarriers = i % 2 == rowChoice ? 7 : 8;
-    float currX = (width - radSize*4*numberOfBarriers + radSize*2)/2;
+    float currX = (width - radSize*4*numberOfBarriers + radSize*2)/2 + extraOffset;
 
     //create random number of bumbers in this row. Random offsets make things more...random
     for (int j = 0; j < numberOfBarriers; j++)
@@ -174,7 +187,7 @@ void generateBlockers()
       Body blocker = physics.createCircle(currX, currY, radSize);
       physics.setRestitution(.1);
       UserData data = new UserData();
-      data.pachinko_type = UserData.BLOCKER;
+      data.pachinko_type = PachinkoType.BLOCKER;
       blocker.setUserData(data);
       currX += radSize*4 + radSize/numberOfBarriers;// width / numberOfBarriers;
     }
@@ -189,9 +202,13 @@ void draw()
   //if ball gets stuck in a non score zone, apply some force to get it moving again
   if (currentBall != null && currentBall.isSleeping () && inScoreArea(currentBall) < 0)
     currentBall.applyImpulse(new Vec2(random(-.1, .1), .5), currentBall.getPosition());
-  if (gameOver)
+
+  if (justStarted)
   {
-    gameOverScreen();
+    if (instruct)
+      instructionScreen();
+    else
+      startScreen();
   }
 }
 
@@ -202,7 +219,23 @@ void mousePressed()
 
 void mouseReleased()
 {
-  if (gameOver)
+  if (justStarted)
+  {
+    if (play.mouseReleased())
+    {
+      setupGame();
+      justStarted = false;
+    }
+    if(instructions.mouseReleased())
+    {
+      instruct = true;
+    }
+    if (backFromInstr.mouseReleased())
+    {
+      instruct = false;
+    }
+  }
+  else if (gameOver)
   {
     if (again.mouseReleased()) //restart game
     {
@@ -224,7 +257,7 @@ void mouseReleased()
 
       currentBall = physics.createCircle(mouseX, startHeight, ballRadius);
       UserData ballData = new UserData();
-      ballData.pachinko_type = UserData.PACHINKO_BALL;
+      ballData.pachinko_type = PachinkoType.PACHINKO_BALL;
       currentBall.setUserData(ballData);
     }
   }
@@ -238,7 +271,7 @@ Body generateRectangleBarrier(float x, float y, float length, float angle, boole
   Body b = physics.createRect(x, y, x+length, y + barrier_h);
   b.setAngle(radians(angle));
   UserData data = new UserData();
-  data.pachinko_type = UserData.BARRIER;
+  data.pachinko_type = PachinkoType.BARRIER;
   data.loc = 0;
   data.moving = isMoving;
   data.udDir = ud;
@@ -253,7 +286,7 @@ float scalar = 1;
 void updateMover(Body mover)
 {
   UserData data = (UserData)mover.getUserData();
-  if (data.pachinko_type == UserData.BARRIER)
+  if (data.pachinko_type == PachinkoType.BARRIER)
   {
     float x, y;
     //figure out the directions to move
@@ -274,8 +307,7 @@ void updateMover(Body mover)
   mover.setUserData(data);
 }
 
-//do most of the drawing. Called in customRenderer
-void displayGame(World world)
+void pulseBackground()
 {
   if (gameMusic != null)
   {
@@ -310,6 +342,12 @@ void displayGame(World world)
   }
   else
     background(150);
+}
+
+//do most of the drawing. Called in customRenderer
+void displayGame(World world)
+{
+  pulseBackground();
   drawScoreArea();
 
   if (currentBall != null)
@@ -347,7 +385,7 @@ void displayGame(World world)
     {
       if (shape.getType() == ShapeType.POLYGON_SHAPE )
       {
-        if (data != null && data.pachinko_type == UserData.SCOREBAR)
+        if (data != null && data.pachinko_type == PachinkoType.SCOREBAR)
         {
           //draw scorebar polygons
           stroke(100);
@@ -365,7 +403,7 @@ void displayGame(World world)
           vertex(firstVert.x, firstVert.y);
           endShape();
         }
-        else if ( data != null && data.pachinko_type == UserData.BARRIER)
+        else if ( data != null && data.pachinko_type == PachinkoType.BARRIER)
         {
           //draw barrier polygons NOT USED FOR NOW
           stroke(255);
@@ -387,7 +425,7 @@ void displayGame(World world)
       else if (shape.getType() == ShapeType.CIRCLE_SHAPE)
       {
         //draw circular blockers
-        if ( data != null && data.pachinko_type == UserData.BLOCKER)
+        if ( data != null && data.pachinko_type == PachinkoType.BLOCKER)
         {
           CircleShape circle = (CircleShape) shape;
           Vec2 pos = physics.worldToScreen(b.getWorldPoint(circle.getLocalPosition()));
@@ -446,11 +484,13 @@ void displayMenu(World world)
   rect(0, 0, width, height);
   fill(255);
   String msg = "Current Score: " + (int)points;
+  textAlign(CENTER);
   textSize(32);
-  text(msg, width/2 - textWidth(msg)/ 2, height/2);
+  text(msg, width/2, height/2);
   String ballMsg = "Balls available: " + (int)ballsLeft;
-  text(ballMsg, width/2 - textWidth(ballMsg)/ 2, height/2 + textAscent() + textDescent());
+  text(ballMsg, width/2, height/2 + textAscent() + textDescent());
   textSize(12);
+  textAlign(LEFT);
 }
 
 //draw nice gameover screen
@@ -465,6 +505,44 @@ void gameOverScreen()
   textSize(12);
   again.display();
   exit.display();
+}
+
+void startScreen()
+{
+  fill(0);
+  rect(width/2, height/2, 100, 100);
+  String title = "Pachinko-ish";
+  String intro = "The Most exciting Pachinko knock-off\nyou've ever seen!!!";
+  pulseBackground();
+  textAlign(CENTER);
+  textSize(36);
+  fill(255);
+  text(title, width/2, height/3);
+  textSize(28);
+  text(intro, width/2, height*2/5);
+  textAlign(LEFT);
+  textSize(12);
+  play.display();
+  instructions.display();
+}
+
+void instructionScreen()
+{
+  String instructions = "The goal of the game get as high a score as you can.\n" +
+    "Each scoring area has a point value. The closer to the center, the more valuable.\n" +
+    "You have 10 balls to score as many points as possible. However, if you hit the center " +
+    " score area, you get your ball back!";
+  String howto = "How to Play: A red circle near the top of the screen lets you know where the pachinko " +
+    "ball will fall when you click the mouse.\nIt turns green when relased. It stays green until " + 
+    "you have successfully scored. You cannot drop another pachinko ball until it is red again.";
+
+  background(0);
+  textAlign(CENTER);
+  textSize(18);
+  text(instructions, 0, height*2/5, width, height*3/5); 
+  textSize(12);
+  textAlign(LEFT);
+  backFromInstr.display();
 }
 
 //return value of score area if ball is there. -1 otherwise
@@ -517,10 +595,10 @@ void printScores()
   printVerticalNumber(12*scoreAreaWidth + 15, height - scoreAreaHeight + size, 50);
   printVerticalNumber(1*scoreAreaWidth + 15, height - scoreAreaHeight + size, 100);
   printVerticalNumber(11*scoreAreaWidth + 15, height - scoreAreaHeight + size, 100);
-  printVerticalNumber(2*scoreAreaWidth + 15, height - scoreAreaHeight + size, 100);
-  printVerticalNumber(10*scoreAreaWidth + 15, height - scoreAreaHeight + size, 100);
-  printVerticalNumber(3*scoreAreaWidth + 15, height - scoreAreaHeight + size, 150);
-  printVerticalNumber(9*scoreAreaWidth + 15, height - scoreAreaHeight + size, 150);
+  printVerticalNumber(2*scoreAreaWidth + 15, height - scoreAreaHeight + size, 150);
+  printVerticalNumber(10*scoreAreaWidth + 15, height - scoreAreaHeight + size, 150);
+  printVerticalNumber(3*scoreAreaWidth + 15, height - scoreAreaHeight + size, 200);
+  printVerticalNumber(9*scoreAreaWidth + 15, height - scoreAreaHeight + size, 200);
   printVerticalNumber(4*scoreAreaWidth + 15, height - scoreAreaHeight + size, 250);
   printVerticalNumber(8*scoreAreaWidth + 15, height - scoreAreaHeight + size, 250);
   printVerticalNumber(5*scoreAreaWidth + 15, height - scoreAreaHeight + size, 500);
@@ -550,7 +628,7 @@ Body createScoreBar(float loc)
 {
   Body b = physics.createRect(loc - 15 / 2, height - scoreAreaHeight, loc + 15 / 2, height);
   UserData data = new UserData();
-  data.pachinko_type = UserData.SCOREBAR;
+  data.pachinko_type = PachinkoType.SCOREBAR;
   b.setUserData(data);
 
   return b;
@@ -575,7 +653,7 @@ void adjustScore(int scoreArea)
     break;
   case 3:
   case 9: 
-    points += 150; 
+    points += 200; 
     break;
   case 4:
   case 8: 
@@ -602,15 +680,15 @@ void collision(Body b1, Body b2, float impulse)
 
   if ( b1Data != null && b2Data != null)
   {
-    if (b1Data.pachinko_type == UserData.BARRIER || b2Data.pachinko_type == UserData.BARRIER)
+    if (b1Data.pachinko_type == PachinkoType.BARRIER || b2Data.pachinko_type == PachinkoType.BARRIER)
     {
       bump.play();
     }
-    if (b1Data.pachinko_type == UserData.BLOCKER || b2Data.pachinko_type == UserData.BLOCKER)
+    if (b1Data.pachinko_type == PachinkoType.BLOCKER || b2Data.pachinko_type == PachinkoType.BLOCKER)
     {
       bump.play();
     }
-    if (b1Data.pachinko_type == UserData.SCOREBAR || b2Data.pachinko_type == UserData.SCOREBAR)
+    if (b1Data.pachinko_type == PachinkoType.SCOREBAR || b2Data.pachinko_type == PachinkoType.SCOREBAR)
     {
       scoreBarNoise.play();
     }

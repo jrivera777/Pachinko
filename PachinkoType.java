@@ -1,0 +1,4 @@
+enum PachinkoType
+{
+  SCOREBAR, BARRIER, BLOCKER, PACHINKO_BALL
+}
